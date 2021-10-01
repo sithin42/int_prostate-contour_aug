@@ -167,7 +167,7 @@ class ContourOutPlaneAug(object):
       return mask
   
 def get_aug_fn(aug_type, bias_type, spacing, IN_AUG_PARAMS, OUT_AUG_PARAMS):
-  print("here")
+  
   assert aug_type in ["in_plane","out_plane","inout_plane"],"Invalid aug_type"
   assert bias_type in ["random","systematic"],"Invalid bias_type"
   
