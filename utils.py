@@ -5,6 +5,8 @@ from skimage import measure
 import scipy
 
 
+
+
 def vol_dice_score(y_pred,y_true, smooth=1e-4):
 
     y_pred = y_pred.flatten()
@@ -20,7 +22,7 @@ def vol_dice_score(y_pred,y_true, smooth=1e-4):
 
 class ContourInPlaneAug(object):
     
-    def __init__(self, w_spacing, h_spacing, w_stdMM,h_stdMM, angle, ob_type="random"): 
+    def __init__(self, w_spacing, h_spacing, w_stdMM,h_stdMM, angle, bias_type="random"): 
         '''
         w_spacing, h_spacing represents the spacing of the input image
         
@@ -39,7 +41,7 @@ class ContourInPlaneAug(object):
         self.h_stdMM = h_stdMM
         self.angle = angle
         
-        self.ob_type = ob_type
+        self.ob_type = bias_type
     
     def __call__(self, mask):  
         
@@ -98,69 +100,97 @@ class ContourInPlaneAug(object):
         
         return out_mask
     
- class ContourOutPlaneAug(object):
+class ContourOutPlaneAug(object):
+  
+  def __init__(self, scale_a, scale_b,angle, delta_z):
+      
+      '''
+      scale_a, scale_b and angle are transformation params and is only used when we synthesize masks beyond the GT boundaries
+      
+      delta_z is the maximum shift or out-plane augmentation allowed
+      '''
+      
+      self.scale_a = scale_a
+      self.scale_b = scale_b
+      self.angle = angle
+      
+      self.delta_z = delta_z
+      
+  def __call__(self, mask):
+      
+      mask = mask.clone()
+  
+      aug_num_slices = np.random.randint(0, self.delta_z+1) #low, high (excluded high)
+      
+      z_indeces = [i.item() for i in torch.where(mask)[1].unique()]
+      
+      z_min, z_max = min(z_indeces), max(z_indeces)
+      
+      for i in range(aug_num_slices):
+      
+          dz = z_max-z_min
+
+          if dz>0: 
+
+              ref_z = np.random.choice([z_min,z_max])
+              
+              flag = -1 if ref_z==z_min else 1
+
+              aug_type = "del" if np.random.uniform()>0.5 else "add"
+          
+              if mask[0,ref_z].sum()>0: #which means contour exists in that place, possible that it got deleted during iteration
+              
+                  if aug_type=="del":
+                      if ref_z+flag in range(mask.shape[1]):
+                          if mask[0,ref_z+flag].sum()==0:#to check if new contours were inserted up or down
+                              mask[0,ref_z] = torch.zeros(*mask[0,ref_z].shape)
+                              
+                      else:#if ref_z+flag is outside the boundary
+                          mask[0, ref_z] = torch.zeros(*mask[0,ref_z].shape)
+
+                  elif aug_type=="add":
+
+                      if ref_z+flag in range(mask.shape[1]):
+                          
+                          if mask[0,ref_z+flag].sum()==0:
+
+                              scales =(1,1,self.scale_a,self.scale_b,self.scale_a,self.scale_b)
+                              degrees = (-self.angle, self.angle,0,0,0,0)
+
+                              transform = tio.RandomAffine(scales=scales,degrees=degrees,p=1)
+
+                              mask[0,ref_z+flag] = transform(mask[0,ref_z].unsqueeze(0).unsqueeze(0))[0,0]
+
+      mask[mask>0.5] = 1
+      mask[mask<=0.5] = 0
+      
+      return mask
+  
+def get_aug_fn(aug_type, bias_type, spacing, IN_AUG_PARAMS, OUT_AUG_PARAMS):
+  print("here")
+  assert aug_type in ["in_plane","out_plane","inout_plane"],"Invalid aug_type"
+  assert bias_type in ["random","systematic"],"Invalid bias_type"
+  
+  if aug_type=="in_plane":             
+    IN_AUG_PARAMS["w_spacing"] = spacing[0]
+    IN_AUG_PARAMS["h_spacing"] = spacing[1]
+    IN_AUG_PARAMS["bias_type"] = bias_type
     
-    def __init__(self, scale_a, scale_b,angle, delta_z):
-        
-        '''
-        scale_a, scale_b and angle are transformation params and is only used when we synthesize masks beyond the GT boundaries
-        
-        delta_z is the maximum shift or out-plane augmentation allowed
-        '''
-        
-        self.scale_a = scale_a
-        self.scale_b = scale_b
-        self.angle = angle
-        
-        self.delta_z = delta_z
-        
-    def __call__(self, mask):
-        
-        mask = mask.clone()
-    
-        aug_num_slices = np.random.randint(0, self.delta_z+1) #low, high (excluded high)
-        
-        z_indeces = [i.item() for i in torch.where(mask)[1].unique()]
-        
-        z_min, z_max = min(z_indeces), max(z_indeces)
-        
-        for i in range(aug_num_slices):
-        
-            dz = z_max-z_min
+    ContourAug = tio.Lambda(ContourInPlaneAug(**IN_AUG_PARAMS),types_to_apply=[tio.LABEL])
 
-            if dz>0: 
+  elif aug_type=="out_plane":
 
-                ref_z = np.random.choice([z_min,z_max])
-                
-                flag = -1 if ref_z==z_min else 1
+    ContourAug = tio.Lambda(ContourOutPlaneAug(**OUT_AUG_PARAMS), types_to_apply=[tio.LABEL])
 
-                aug_type = "del" if np.random.uniform()>0.5 else "add"
-            
-                if mask[0,ref_z].sum()>0: #which means contour exists in that place, possible that it got deleted during iteration
-                
-                    if aug_type=="del":
-                        if ref_z+flag in range(mask.shape[1]):
-                            if mask[0,ref_z+flag].sum()==0:#to check if new contours were inserted up or down
-                                mask[0,ref_z] = torch.zeros(*mask[0,ref_z].shape)
-                                
-                        else:#if ref_z+flag is outside the boundary
-                            mask[0, ref_z] = torch.zeros(*mask[0,ref_z].shape)
+  elif aug_type=="inout_plane":
 
-                    elif aug_type=="add":
+    IN_AUG_PARAMS["w_spacing"] = spacing[0]
+    IN_AUG_PARAMS["h_spacing"] = spacing[1]
+    IN_AUG_PARAMS["bias_type"] = bias_type
 
-                        if ref_z+flag in range(mask.shape[1]):
-                            
-                            if mask[0,ref_z+flag].sum()==0:
+    ContourAug = tio.Compose([
+        tio.Lambda(ContourInPlaneAug(**IN_AUG_PARAMS),types_to_apply=[tio.LABEL]),
+        tio.Lambda(ContourOutPlaneAug(**OUT_AUG_PARAMS), types_to_apply=[tio.LABEL])
+    ])
 
-                                scales =(1,1,self.scale_a,self.scale_b,self.scale_a,self.scale_b)
-                                degrees = (-self.angle, self.angle,0,0,0,0)
-
-                                transform = tio.RandomAffine(scales=scales,degrees=degrees,p=1)
-
-                                mask[0,ref_z+flag] = transform(mask[0,ref_z].unsqueeze(0).unsqueeze(0))[0,0]
-
-        mask[mask>0.5] = 1
-        mask[mask<=0.5] = 0
-        
-        return mask
-   
+  return ContourAug
