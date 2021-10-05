@@ -168,8 +168,12 @@ class ContourOutPlaneAug(object):
   
 def get_aug_fn(aug_type, bias_type, spacing, IN_AUG_PARAMS, OUT_AUG_PARAMS):
   
-  assert aug_type in ["in_plane","out_plane","inout_plane"],"Invalid aug_type"
-  assert bias_type in ["random","systematic"],"Invalid bias_type"
+  assert aug_type in ["in_plane","out_plane","inout_plane"], "Invalid aug_type!"
+
+  if aug_type!="out_plane":
+    assert bias_type in ["random","systematic"], "Invalid bias_type!"
+  else:
+    assert bias_type=="", "For out_plane augmentation bias_type should be an empty string"
   
   if aug_type=="in_plane":             
     IN_AUG_PARAMS["w_spacing"] = spacing[0]
