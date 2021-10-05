@@ -22,7 +22,7 @@ Keywords: prostate cancer; segmentation variation; deep learning; radiomic featu
 
 # Repository Overview
 
-Contains 3 jupyter notebooks which can either be run locally on your computer by downloading the entire repository or can be run remotely on Google Colab
+Contains 3 jupyter notebooks which can either be run locally on your computer after downloading the entire repository or can be run remotely on Google Colab
 
 1. **Contour Generator:** This notebook was designed to visualize the impact of various augmentation scenarios on a sample data. It can be run locally on your computer or on google colab.
 2. **Radiomics Feature Extractor:** This notebook was designed to illustrate the workflow associated with in-silico contour generation using Torchio and feature extraction using pyradiomics
