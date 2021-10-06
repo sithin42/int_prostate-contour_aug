@@ -6,7 +6,7 @@ Preprint available @ NA
 
 Publication available @ NA
 
-**Note:** `Please cite the paper (if available) or this Github repo if you find shared codes and information useful!`
+**Note:** `Please cite the paper (if available) or this Github repo if you find the shared codes and information useful!`
 
 # Abstract:
 
