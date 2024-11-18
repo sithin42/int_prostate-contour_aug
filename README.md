@@ -2,11 +2,9 @@
 
 This repository contains data and code accompanying our publication on "Assessing the stability of mpMRI prostate radiomic features to variations in segmentation using in-silico contour generation"
 
-Preprint available @ NA
+Publication available @ [NA](https://doi.org/10.3390/jpm13071172)
 
-Publication available @ NA
-
-**Note:** `Please cite the paper (if available) or this Github repo if you find the shared codes and information useful!`
+**Note:** `Please cite the paper if you find the shared codes and information useful!`
 
 # Abstract:
 
